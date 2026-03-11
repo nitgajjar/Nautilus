@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="NAUTILUS — Real-time maritime risk intelligence. Live threat scoring for 200 global ports using AI-powered RSS analysis."/>
+  <meta property="og:title" content="NAUTILUS — Maritime Risk Intelligence"/>
+  <meta property="og:description" content="Real-time geopolitical risk scores for 200 global ports. Live RSS feed analysis, interactive world map."/>
+  <meta property="og:type" content="website"/>
+  <title>NAUTILUS — Maritime Risk Intelligence</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+  <div class="scanlines"></div>
+
+  <!-- LOADING OVERLAY -->
+  <div id="loadingOverlay">
+    <div class="loading-logo">NAUTILUS</div>
+    <div class="loading-sub">MARITIME RISK INTELLIGENCE SYSTEM</div>
+    <div class="loading-bar-wrap"><div class="loading-bar-fill"></div></div>
+    <div class="loading-status" id="loadingStatus">INITIALIZING...</div>
+  </div>
+
+  <!-- ABOUT MODAL -->
+  <div id="aboutModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <button class="modal-close" onclick="document.getElementById('aboutModal').classList.add('hidden')">✕</button>
+      <div class="modal-logo">⬡ NAUTILUS</div>
+      <div class="modal-tagline">MARITIME RISK INTELLIGENCE PLATFORM</div>
+      <div class="modal-body">
+        <p>NAUTILUS is a real-time geopolitical risk intelligence dashboard monitoring <strong>200 global ports</strong> across every major shipping region on Earth.</p>
+        <div class="modal-features">
+          <div class="modal-feature">
+            <div class="modal-feature-icon">📡</div>
+            <div>
+              <div class="modal-feature-title">LIVE RSS INTELLIGENCE</div>
+              <div class="modal-feature-desc">Pulls from 17 global news sources every 20 minutes — maritime, geopolitical, defence.</div>
+            </div>
+          </div>
+          <div class="modal-feature">
+            <div class="modal-feature-icon">⚠</div>
+            <div>
+              <div class="modal-feature-title">5-TIER THREAT SCORING</div>
+              <div class="modal-feature-desc">Custom keyword-matching engine scores each port 0–10 across War, Cyber, Military, Elevated and Watch tiers.</div>
+            </div>
+          </div>
+          <div class="modal-feature">
+            <div class="modal-feature-icon">🗺</div>
+            <div>
+              <div class="modal-feature-title">INTERACTIVE WORLD MAP</div>
+              <div class="modal-feature-desc">200 ports plotted globally. Click any marker for full standing threat assessment and live intel.</div>
+            </div>
+          </div>
+          <div class="modal-feature">
+            <div class="modal-feature-icon">🧠</div>
+            <div>
+              <div class="modal-feature-title">STANDING INTELLIGENCE</div>
+              <div class="modal-feature-desc">Every port has a hand-written geopolitical brief covering known threats, chokepoints, and baseline risk context.</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-disclaimer">
+          NAUTILUS is an independent research project. Data is sourced from public RSS feeds.
+          Not intended for operational maritime navigation decisions.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo" onclick="document.getElementById('aboutModal').classList.remove('hidden')" style="cursor:pointer" title="About NAUTILUS">
+      <span class="logo-icon">⬡</span>
+      <div>
+        <div class="logo-title">NAUTILUS</div>
+        <div class="logo-sub">MARITIME RISK INTELLIGENCE</div>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="stat-box">
+        <div class="stat-val" id="criticalCount">—</div>
+        <div class="stat-label">CRITICAL</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val warn" id="highCount">—</div>
+        <div class="stat-label">HIGH RISK</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val safe" id="safeCount">—</div>
+        <div class="stat-label">SAFE</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val info" id="alertCount">—</div>
+        <div class="stat-label">ALERTS</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div id="timezoneBar" class="timezone-bar"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <div class="feed-status">
+          <span class="pulse-dot" id="feedDot"></span>
+          <span id="feedStatus">INITIALIZING...</span>
+        </div>
+        <button class="refresh-btn" onclick="setNextRefresh(); fetchAndAnalyzeFeeds()">⟳ REFRESH</button>
+        <button class="about-btn" onclick="document.getElementById('aboutModal').classList.remove('hidden')">? ABOUT</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MOBILE NAV TABS -->
+  <nav class="mobile-tabs">
+    <button class="tab-btn active" onclick="showTab('map',this)">🗺 MAP</button>
+    <button class="tab-btn" onclick="showTab('ports',this)">⚓ PORTS</button>
+    <button class="tab-btn" onclick="showTab('intel',this)">📡 INTEL</button>
+    <button class="tab-btn" onclick="showTab('detail',this)">🔍 DETAIL</button>
+  </nav>
+
+  <!-- MAIN LAYOUT -->
+  <div class="layout">
+
+    <!-- LEFT: PORT LIST -->
+    <aside class="left-panel" id="tab-ports">
+      <div class="panel-header">
+        <span>MONITORED PORTS</span>
+        <span class="panel-count" id="portCount">200</span>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search port or country..." oninput="filterPorts()" />
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setFilter('all',this)">ALL</button>
+        <button class="filter-btn" onclick="setFilter('critical',this)">CRIT</button>
+        <button class="filter-btn" onclick="setFilter('high',this)">HIGH</button>
+        <button class="filter-btn" onclick="setFilter('safe',this)">SAFE</button>
+      </div>
+      <div id="portList" class="port-list"></div>
+    </aside>
+
+    <!-- CENTER: MAP -->
+    <main class="map-container" id="tab-map">
+      <div id="map"></div>
+      <div class="map-legend">
+        <div class="legend-item"><span class="dot critical"></span>Critical (8-10)</div>
+        <div class="legend-item"><span class="dot high"></span>High (5-7)</div>
+        <div class="legend-item"><span class="dot medium"></span>Medium (3-4)</div>
+        <div class="legend-item"><span class="dot safe"></span>Safe (0-2)</div>
+      </div>
+    </main>
+
+    <!-- RIGHT: INTEL FEED + PORT DETAIL -->
+    <aside class="right-panel">
+      <div class="panel-header">
+        <span>LIVE INTEL FEED</span>
+        <span class="blink">●</span>
+      </div>
+      <div id="alertFeed" class="alert-feed" id="tab-intel">
+        <div class="alert-placeholder">⟳ Scanning RSS feeds...</div>
+      </div>
+      <div class="panel-header selected-port-header">
+        <span>SELECTED PORT</span>
+      </div>
+      <div id="portDetail" class="port-detail" id="tab-detail">
+        <div class="alert-placeholder">Click a port on the map<br>or from the list to inspect</div>
+      </div>
+    </aside>
+
+  </div>
+
+  <div id="tooltip" class="tooltip hidden"></div>
+
+  <script src="ports.js"></script>
+  <script src="feeds.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
