@@ -8,6 +8,22 @@
   <meta property="og:description" content="Real-time geopolitical risk scores for 200 global ports. Live RSS feed analysis, interactive world map."/>
   <meta property="og:type" content="website"/>
   <title>NAUTILUS — Maritime Risk Intelligence</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="nautilus_32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="nautilus_16.png" />
+  <link rel="apple-touch-icon" sizes="128x128" href="nautilus_128.png" />
+
+  <!-- OG / Social sharing -->
+  <meta property="og:image" content="og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NAUTILUS — Maritime Risk Intelligence" />
+  <meta name="twitter:description" content="Real-time geopolitical risk scores for 200 global ports." />
+  <meta name="twitter:image" content="og-image.png" />
+
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -60,6 +76,13 @@
             <div>
               <div class="modal-feature-title">STANDING INTELLIGENCE</div>
               <div class="modal-feature-desc">Every port has a hand-written geopolitical brief covering known threats, chokepoints, and baseline risk context.</div>
+            </div>
+          </div>
+          <div class="modal-feature">
+            <div class="modal-feature-icon">📦</div>
+            <div>
+              <div class="modal-feature-title">TRADE INTELLIGENCE</div>
+              <div class="modal-feature-desc">Filter ports by commodity — crude oil, LNG, grain, electronics and more. See major imports and exports for every port.</div>
             </div>
           </div>
         </div>
@@ -124,21 +147,33 @@
   <!-- MAIN LAYOUT -->
   <div class="layout">
 
-    <!-- LEFT: PORT LIST -->
-    <aside class="left-panel" id="tab-ports">
+    <!-- LEFT: PORT LIST + TRADE FILTER -->
+    <aside class="left-panel">
       <div class="panel-header">
         <span>MONITORED PORTS</span>
         <span class="panel-count" id="portCount">200</span>
       </div>
       <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="Search port or country..." oninput="filterPorts()" />
+        <input type="text" id="searchInput" placeholder="Search port, country or commodity..." oninput="filterPorts()" />
       </div>
+
+      <!-- RISK FILTER -->
       <div class="filter-row">
         <button class="filter-btn active" onclick="setFilter('all',this)">ALL</button>
         <button class="filter-btn" onclick="setFilter('critical',this)">CRIT</button>
         <button class="filter-btn" onclick="setFilter('high',this)">HIGH</button>
         <button class="filter-btn" onclick="setFilter('safe',this)">SAFE</button>
       </div>
+
+      <!-- TRADE COMMODITY FILTER -->
+      <div class="trade-filter-section">
+        <div class="trade-filter-header">
+          <span class="trade-filter-title">📦 FILTER BY COMMODITY</span>
+          <button class="trade-filter-clear" onclick="clearTradeFilter()">CLEAR</button>
+        </div>
+        <div id="tradeFilterList" class="trade-filter-list"></div>
+      </div>
+
       <div id="portList" class="port-list"></div>
     </aside>
 
@@ -155,18 +190,24 @@
 
     <!-- RIGHT: INTEL FEED + PORT DETAIL -->
     <aside class="right-panel">
-      <div class="panel-header">
-        <span>LIVE INTEL FEED</span>
-        <span class="blink">●</span>
+      <!-- Intel section -->
+      <div class="intel-section">
+        <div class="panel-header">
+          <span>LIVE INTEL FEED</span>
+          <span class="blink">●</span>
+        </div>
+        <div id="alertFeed" class="alert-feed">
+          <div class="alert-placeholder">⟳ Scanning RSS feeds...</div>
+        </div>
       </div>
-      <div id="alertFeed" class="alert-feed" id="tab-intel">
-        <div class="alert-placeholder">⟳ Scanning RSS feeds...</div>
-      </div>
-      <div class="panel-header selected-port-header">
-        <span>SELECTED PORT</span>
-      </div>
-      <div id="portDetail" class="port-detail" id="tab-detail">
-        <div class="alert-placeholder">Click a port on the map<br>or from the list to inspect</div>
+      <!-- Detail section -->
+      <div class="detail-section">
+        <div class="panel-header selected-port-header">
+          <span>SELECTED PORT</span>
+        </div>
+        <div id="portDetail" class="port-detail">
+          <div class="alert-placeholder">Click a port on the map<br>or from the list to inspect</div>
+        </div>
       </div>
     </aside>
 
