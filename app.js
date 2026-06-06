@@ -3,6 +3,7 @@ let map;
 let markers = {};
 let selectedPortId = null;
 let currentFilter = "all";
+let currentTradeFilter = "all"; // NEW: trade commodity filter
 
 // Risk level helpers
 function getRiskLevel(score) {
@@ -36,13 +37,11 @@ function initMap() {
     zoomControl: true,
   });
 
-  // Dark tile layer
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '© OpenStreetMap',
     className: "dark-tiles"
   }).addTo(map);
 
-  // Add CSS to darken map tiles
   const style = document.createElement("style");
   style.textContent = `.dark-tiles { filter: invert(100%) hue-rotate(180deg) brightness(0.6) saturate(0.5); }`;
   document.head.appendChild(style);
@@ -103,11 +102,9 @@ function addMarkers() {
       .on("mouseover", (e) => showTooltip(port.id, e.originalEvent))
       .on("mouseout", hideTooltip)
       .on("mousemove", (e) => moveTooltip(e.originalEvent));
-
     markers[port.id] = marker;
   });
 
-  // Add pulse ring CSS
   const style = document.createElement("style");
   style.textContent = `
     @keyframes pulse-ring {
@@ -138,7 +135,7 @@ function showTooltip(portId, e) {
 
   const tooltip = document.getElementById("tooltip");
   tooltip.innerHTML = `
-    <div class="tooltip-name">${port.name}</div>
+    <div class="tooltip-name">${port.flag || ""} ${port.name}</div>
     <div class="tooltip-country">📍 ${port.country} · ${port.region}</div>
     <div class="tooltip-score" style="color:${color}">${score.toFixed(1)}<span style="font-size:0.9rem;color:#4a7a99">/10</span></div>
     <div style="font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:${color};margin-bottom:6px;letter-spacing:1px;">${label}</div>
@@ -148,6 +145,10 @@ function showTooltip(portId, e) {
       </div>` : port.intel ? `
       <div class="tooltip-reason" style="color:var(--text-mid)">
         ${port.intel.slice(0, 120)}…
+      </div>` : ""}
+    ${port.exports ? `
+      <div class="tooltip-trade">
+        <span class="tooltip-trade-label">📤</span> ${(port.exports||[]).slice(0,3).join(" · ")}
       </div>` : ""}
     <div class="tooltip-hint">Click for full details →</div>
   `;
@@ -170,6 +171,42 @@ function hideTooltip() {
   document.getElementById("tooltip").classList.add("hidden");
 }
 
+// ─── TRADE FILTER ────────────────────────────────────────────
+// All unique commodities across all ports for the filter slider
+const TRADE_COMMODITIES = [
+  "Crude oil","LNG","Coal","Iron ore","Gold","Copper","Grain","Wheat",
+  "Soybeans","Electronics","Machinery","Vehicles","Pharmaceuticals",
+  "Chemicals","Steel","Timber","Fish","Diamonds","Textiles","Garments",
+  "Rice","Coffee","Cocoa","Rubber","Palm oil","Aluminium","Phosphates",
+  "Nickel","Uranium","Cotton"
+];
+
+function buildTradeFilter() {
+  const container = document.getElementById("tradeFilterList");
+  if (!container) return;
+  container.innerHTML = TRADE_COMMODITIES.map(c => `
+    <button class="trade-filter-btn${currentTradeFilter === c ? " active" : ""}"
+      onclick="setTradeFilter('${c}', this)">${c}</button>
+  `).join("");
+}
+
+function setTradeFilter(commodity, btn) {
+  // Toggle off if clicking same one
+  if (currentTradeFilter === commodity) {
+    currentTradeFilter = "all";
+  } else {
+    currentTradeFilter = commodity;
+  }
+  buildTradeFilter();
+  renderPortList();
+}
+
+function clearTradeFilter() {
+  currentTradeFilter = "all";
+  buildTradeFilter();
+  renderPortList();
+}
+
 // ─── PORT LIST ──────────────────────────────────────────────
 function renderPortList() {
   const container = document.getElementById("portList");
@@ -189,13 +226,22 @@ function renderPortList() {
     const level = getRiskLevel(score);
     const color = getRiskColor(score);
 
+    // Risk filter
     if (currentFilter !== "all") {
       if (currentFilter === "critical" && level !== "critical") return;
       if (currentFilter === "high"     && level !== "high")     return;
       if (currentFilter === "safe"     && level !== "safe")     return;
     }
+
+    // Trade commodity filter
+    if (currentTradeFilter !== "all") {
+      const allTrade = [...(port.exports || []), ...(port.imports || [])].map(t => t.toLowerCase());
+      if (!allTrade.some(t => t.includes(currentTradeFilter.toLowerCase()))) return;
+    }
+
+    // Search filter
     if (search) {
-      const s = `${port.name} ${port.country} ${port.region}`.toLowerCase();
+      const s = `${port.name} ${port.country} ${port.region} ${(port.exports||[]).join(" ")} ${(port.imports||[]).join(" ")}`.toLowerCase();
       if (!s.includes(search)) return;
     }
 
@@ -207,7 +253,7 @@ function renderPortList() {
       <div class="port-rank">${rank}</div>
       <div class="port-risk-badge ${level}">${score % 1 === 0 ? score : score.toFixed(1)}</div>
       <div class="port-info">
-        <div class="port-name">${port.name.replace("Port of ","")}</div>
+        <div class="port-name">${port.flag || ""} ${port.name.replace("Port of ","")}</div>
         <div class="port-meta">${port.country} · ${port.region}</div>
         <div class="risk-bar-mini">
           <div class="risk-bar-fill" style="width:${score*10}%;background:${color}"></div>
@@ -231,14 +277,13 @@ function selectPort(portId) {
   const level = getRiskLevel(score);
   const label = getRiskLabel(score);
 
-  // Pan map to port
   map.flyTo([port.lat, port.lng], 5, { duration: 1 });
 
-  // Render detail panel
   const detail = document.getElementById("portDetail");
   detail.innerHTML = `
     <div class="detail-card">
-      <div class="detail-name">${port.name}</div>
+
+      <div class="detail-name">${port.flag || ""} ${port.name}</div>
       <div class="detail-country">📍 ${port.country} · ${port.region}</div>
 
       <div class="risk-score-display">
@@ -255,9 +300,35 @@ function selectPort(portId) {
         <div class="risk-bar-full-fill" style="width:${score * 10}%;background:linear-gradient(90deg,${color}88,${color})"></div>
       </div>
 
-      <div class="detail-section-title">MONITORED KEYWORDS</div>
-      <div class="keywords-list">
-        ${port.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join("")}
+      <!-- TRADE PROFILE — prominent section -->
+      <div class="detail-section-title">TRADE PROFILE</div>
+      <div class="trade-section">
+        <div class="trade-block">
+          <div class="trade-block-header export-header">
+            <span class="trade-block-icon">📤</span>
+            <span class="trade-block-label">MAJOR EXPORTS</span>
+          </div>
+          <div class="trade-items">
+            ${(port.exports || []).map((e, i) => `
+              <div class="trade-item export-item">
+                <span class="trade-item-rank">${i + 1}</span>
+                <span class="trade-item-name">${e}</span>
+              </div>`).join("")}
+          </div>
+        </div>
+        <div class="trade-block">
+          <div class="trade-block-header import-header">
+            <span class="trade-block-icon">📥</span>
+            <span class="trade-block-label">MAJOR IMPORTS</span>
+          </div>
+          <div class="trade-items">
+            ${(port.imports || []).map((imp, i) => `
+              <div class="trade-item import-item">
+                <span class="trade-item-rank">${i + 1}</span>
+                <span class="trade-item-name">${imp}</span>
+              </div>`).join("")}
+          </div>
+        </div>
       </div>
 
       <div class="detail-section-title">STANDING THREAT ASSESSMENT</div>
@@ -281,6 +352,11 @@ function selectPort(portId) {
         }
       </div>
 
+      <div class="detail-section-title">MONITORED KEYWORDS</div>
+      <div class="keywords-list">
+        ${port.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join("")}
+      </div>
+
       <div class="detail-section-title" style="margin-top:14px">LOCATION DATA</div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#4a7a99;line-height:1.8">
         LAT: ${port.lat.toFixed(4)}<br>
@@ -290,10 +366,8 @@ function selectPort(portId) {
     </div>
   `;
 
-  // Re-render list to show selection
   renderPortList();
 
-  // On mobile, auto-switch to detail tab
   if (window.innerWidth <= 768) {
     const detailBtn = document.querySelectorAll(".tab-btn")[3];
     if (detailBtn) showTab("detail", detailBtn);
@@ -336,7 +410,6 @@ function renderAlertFeed() {
 // ─── HEADER STATS ───────────────────────────────────────────
 function updateHeaderStats() {
   let critical = 0, high = 0, safe = 0;
-
   PORTS.forEach(port => {
     const score = portRiskData[port.id]?.score || port.baseRisk;
     const level = getRiskLevel(score);
@@ -344,7 +417,6 @@ function updateHeaderStats() {
     else if (level === "high") high++;
     else if (level === "safe") safe++;
   });
-
   document.getElementById("criticalCount").textContent = critical;
   document.getElementById("highCount").textContent = high;
   document.getElementById("safeCount").textContent = safe;
@@ -353,41 +425,41 @@ function updateHeaderStats() {
 
 // ─── MOBILE TAB NAVIGATION ──────────────────────────────────
 function showTab(tab, btn) {
-  // Update tab buttons
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
 
-  // Map tab names to elements
-  const panels = {
-    map:    document.querySelector(".map-container"),
-    ports:  document.querySelector(".left-panel"),
-    intel:  document.querySelector(".right-panel"),
-    detail: document.querySelector(".right-panel"),
-  };
-
-  // Hide all, show selected
   document.querySelector(".map-container").classList.remove("tab-active");
   document.querySelector(".left-panel").classList.remove("tab-active");
   document.querySelector(".right-panel").classList.remove("tab-active");
 
-  if (panels[tab]) panels[tab].classList.add("tab-active");
+  const intelSec  = document.querySelector(".intel-section");
+  const detailSec = document.querySelector(".detail-section");
 
-  // Resize map when it becomes visible (Leaflet needs this)
-  if (tab === "map" && map) {
-    setTimeout(() => map.invalidateSize(), 50);
-  }
-
-  // If switching to detail on mobile, scroll port detail into view
-  if (tab === "detail") {
+  if (tab === "map") {
+    document.querySelector(".map-container").classList.add("tab-active");
+    setTimeout(() => map && map.invalidateSize(), 50);
+  } else if (tab === "ports") {
+    document.querySelector(".left-panel").classList.add("tab-active");
+  } else if (tab === "intel") {
+    document.querySelector(".right-panel").classList.add("tab-active");
+    if (intelSec)  intelSec.style.display  = "flex";
+    if (detailSec) detailSec.style.display = "none";
+  } else if (tab === "detail") {
+    document.querySelector(".right-panel").classList.add("tab-active");
+    if (intelSec)  intelSec.style.display  = "none";
+    if (detailSec) detailSec.style.display = "flex";
     const detail = document.getElementById("portDetail");
     if (detail) setTimeout(() => detail.scrollIntoView({ behavior: "smooth" }), 100);
   }
 }
 
-// On load, activate map tab by default on mobile
 function initMobileTabs() {
   if (window.innerWidth <= 768) {
     document.querySelector(".map-container")?.classList.add("tab-active");
+    const intelSec  = document.querySelector(".intel-section");
+    const detailSec = document.querySelector(".detail-section");
+    if (intelSec)  intelSec.style.display  = "flex";
+    if (detailSec) detailSec.style.display = "none";
   }
 }
 
@@ -460,7 +532,6 @@ function updateClock() {
 window.addEventListener("DOMContentLoaded", async () => {
   const overlay = document.getElementById("loadingOverlay");
   const status  = document.getElementById("loadingStatus");
-
   const setStatus = (msg) => { if (status) status.textContent = msg; };
 
   setStatus("LOADING MAP ENGINE...");
@@ -473,17 +544,17 @@ window.addEventListener("DOMContentLoaded", async () => {
   await new Promise(r => setTimeout(r, 300));
 
   addMarkers();
+  buildTradeFilter();
   renderPortList();
   updateHeaderStats();
   updateClock();
   initMobileTabs();
   setInterval(() => { updateClock(); updateRefreshCountdown(); }, 1000);
-  setInterval(fetchAndAnalyzeFeeds, 20 * 60 * 1000); // 20min: 17 feeds × 3/hr = 51 req (under rss2json free 60/hr limit)
+  setInterval(fetchAndAnalyzeFeeds, 20 * 60 * 1000);
 
   setStatus("CONNECTING TO LIVE FEEDS...");
   await new Promise(r => setTimeout(r, 400));
 
-  // Hide overlay smoothly then fetch
   overlay.classList.add("hidden");
   setTimeout(() => { overlay.style.display = "none"; }, 700);
 
